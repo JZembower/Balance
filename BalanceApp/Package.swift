@@ -2,24 +2,24 @@
 import PackageDescription
 
 let package = Package(
-    name: "Balance",
+    name: "BalanceApp",
     platforms: [
         .iOS(.v17)
     ],
     products: [
-        // Remove library product - iOS apps don't need this
+        .library(
+            name: "BalanceApp",
+            targets: ["BalanceApp"]
+        )
     ],
     dependencies: [
-        // Add dependencies here if needed later
+        // Add dependencies here if needed
     ],
     targets: [
-        .executableTarget(
+        .target(
             name: "BalanceApp",
             dependencies: [],
-            path: "Sources/BalanceApp",
-            resources: [
-                .process("Resources")
-            ]
+            path: "Sources/BalanceApp"
         ),
         .testTarget(
             name: "BalanceAppTests",
