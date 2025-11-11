@@ -1,4 +1,4 @@
-### Balance App — README
+### Balance App
 
 ![App Screenshot](TestOutput.png)
 
