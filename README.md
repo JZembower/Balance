@@ -1,5 +1,7 @@
 ### Balance App — README
 
+![App Screenshot](TestOutput.png)
+
 #### Overview
 Balance App is an iOS SwiftUI application that helps users understand their focus cues based on a combination of:
 - Apple HealthKit data: heart rate, sleep, steps, active energy, and workouts
