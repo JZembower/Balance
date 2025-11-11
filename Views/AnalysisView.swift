@@ -5,7 +5,6 @@
 //  Created by j.zembower on 11/8/25.
 //
 
-
 import SwiftUI
 
 struct AnalysisView: View {
@@ -114,10 +113,12 @@ struct AnalysisView: View {
     }
 }
 
-// Preview
+// MARK: - Preview
+
 struct AnalysisView_Previews: PreviewProvider {
     static var previews: some View {
         AnalysisView(analysis: FocusAnalysis(
+            id: UUID().uuidString,
             summary: "Your focus levels are optimal during morning hours when your heart rate is steady and you've had adequate sleep. Current stress indicators suggest taking short breaks every 45 minutes.",
             focusScore: 78,
             recommendations: [
@@ -125,7 +126,8 @@ struct AnalysisView_Previews: PreviewProvider {
                 "Your heart rate variability suggests good stress management",
                 "Maintain current sleep schedule (7.5 hours average)"
             ],
-            timestamp: Date()
+            timestamp: Date(),
+            userID: "test-user"
         ))
     }
 }

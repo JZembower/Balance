@@ -10,6 +10,10 @@ import SwiftData
 
 @main
 struct BalanceAppApp: App {
+    // Initialize UserSessionManager on app launch
+    @StateObject private var userSession = UserSessionManager.shared
+    @StateObject private var dataManager = DataManager.shared
+    
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
@@ -26,6 +30,8 @@ struct BalanceAppApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(userSession)
+                .environmentObject(dataManager)
         }
         .modelContainer(sharedModelContainer)
     }

@@ -5,56 +5,82 @@
 //  Created by j.zembower on 11/8/25.
 //
 
-
 import SwiftUI
 
 struct HistoryView: View {
-    @State private var analyses: [FocusAnalysis] = []
+    @StateObject private var dataManager = DataManager.shared
     @State private var selectedAnalysis: FocusAnalysis?
     
     var body: some View {
         List {
-            if analyses.isEmpty {
-                Text("No analysis history yet")
-                    .foregroundColor(.gray)
-                    .italic()
+            if dataManager.recentAnalyses.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "clock.badge.questionmark")
+                        .font(.system(size: 50))
+                        .foregroundColor(.gray)
+                    Text("No analysis history yet")
+                        .foregroundColor(.gray)
+                        .italic()
+                    Text("Complete your first focus analysis to see results here")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
             } else {
-                ForEach(Array(analyses.enumerated()), id: \.offset) { index, analysis in
+                ForEach(dataManager.recentAnalyses) { analysis in
                     Button(action: {
                         selectedAnalysis = analysis
                     }) {
                         HStack {
-                            VStack(alignment: .leading) {
+                            VStack(alignment: .leading, spacing: 5) {
                                 Text(formattedDate(analysis.timestamp))
                                     .font(.headline)
                                 Text("Focus Score: \(Int(analysis.focusScore))")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
+                                
+                                if let userID = analysis.userID {
+                                    Text("User: \(userID.prefix(8))...")
+                                        .font(.caption2)
+                                        .foregroundColor(.gray)
+                                }
                             }
                             
                             Spacer()
                             
-                            Circle()
-                                .fill(scoreColor(analysis.focusScore))
-                                .frame(width: 40, height: 40)
-                                .overlay(
-                                    Text("\(Int(analysis.focusScore))")
-                                        .font(.caption)
-                                        .foregroundColor(.white)
-                                )
+                            ZStack {
+                                Circle()
+                                    .fill(scoreColor(analysis.focusScore))
+                                    .frame(width: 50, height: 50)
+                                
+                                Text("\(Int(analysis.focusScore))")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .bold()
+                            }
                         }
+                        .padding(.vertical, 5)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .onDelete(perform: deleteAnalyses)
+            }
+        }
+        .navigationTitle("History")
+        .toolbar {
+            if !dataManager.recentAnalyses.isEmpty {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(role: .destructive) {
+                        clearHistory()
+                    } label: {
+                        Label("Clear All", systemImage: "trash")
                     }
                 }
             }
         }
-        .navigationTitle("History")
-        .onAppear {
-            analyses = DataManager.shared.getAnalysisHistory().reversed()
-        }
-        .sheet(item: Binding(
-            get: { selectedAnalysis },
-            set: { selectedAnalysis = $0 }
-        )) { analysis in
+        .sheet(item: $selectedAnalysis) { analysis in
             NavigationView {
                 AnalysisView(analysis: analysis)
                     .navigationTitle("Past Analysis")
@@ -64,6 +90,8 @@ struct HistoryView: View {
             }
         }
     }
+    
+    // MARK: - Helper Functions
     
     private func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
@@ -82,11 +110,25 @@ struct HistoryView: View {
             return .green
         }
     }
+    
+    private func deleteAnalyses(at offsets: IndexSet) {
+        for index in offsets {
+            let analysis = dataManager.recentAnalyses[index]
+            dataManager.deleteAnalysis(withID: analysis.id)
+        }
+    }
+    
+    private func clearHistory() {
+        dataManager.clearHistory()
+    }
 }
 
-// Make FocusAnalysis Identifiable for sheet
-extension FocusAnalysis: Identifiable {
-    var id: String {
-        "\(timestamp.timeIntervalSince1970)"
+// MARK: - Preview
+
+struct HistoryView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationView {
+            HistoryView()
+        }
     }
 }

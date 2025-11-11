@@ -6,11 +6,12 @@
 //
 
 import SwiftUI
-import HealthKit  // ADD THIS LINE
+import HealthKit
 
 struct ActivityInputView: View {
     @StateObject private var healthManager = HealthKitManager()
-    @StateObject private var llmService = LLMService()
+    @StateObject private var userSession = UserSessionManager.shared
+    @StateObject private var dataManager = DataManager.shared
     
     @State private var activity = ""
     @State private var duration = 1.0
@@ -20,13 +21,14 @@ struct ActivityInputView: View {
     @State private var showingAnalysis = false
     @State private var analysis: FocusAnalysis?
     @State private var errorMessage: String?
+    @State private var showRetry = false
     @State private var selectedScenario: MockHealthKitManager.MockScenario = .wellRested
     
     let activities = ["Studying", "Working", "Exercising", "Relaxing", "Meeting", "Creative Work"]
     
     var body: some View {
         Form {
-            // Add this section at the top if using mock data
+            // Test Mode Section
             if Config.useMockData {
                 Section("Testing Scenario") {
                     Picker("Health Data Scenario", selection: $selectedScenario) {
@@ -43,6 +45,7 @@ struct ActivityInputView: View {
                 }
             }
             
+            // Activity Details Section
             Section("Activity Details") {
                 Picker("Activity Type", selection: $activity) {
                     ForEach(activities, id: \.self) { activity in
@@ -52,72 +55,111 @@ struct ActivityInputView: View {
                 
                 VStack(alignment: .leading) {
                     Text("Duration: \(String(format: "%.1f", duration)) hours")
-                    Slider(value: $duration, in: 0.5...12, step: 0.5)
+                    Slider(value: $duration, in: 0.5...16, step: 0.5)
                 }
                 
-                if duration > 8 {
-                    Text("⚠️ Long duration detected")
+                // Duration warnings
+                if duration > 12 {
+                    Label("Long duration - consider taking breaks", systemImage: "exclamationmark.triangle")
                         .font(.caption)
                         .foregroundColor(.orange)
                 }
                 
                 if duration > 16 {
-                    Text("❌ Duration exceeds recommended limits")
+                    Label("Duration exceeds recommended limits", systemImage: "xmark.circle")
                         .font(.caption)
                         .foregroundColor(.red)
                 }
             }
             
+            // Self Assessment Section
             Section("Self Assessment") {
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 10) {
                     Text("Stress Level: \(stressLevel)/10")
+                        .font(.subheadline)
                     HStack {
                         Text("Low")
                             .font(.caption)
+                            .foregroundColor(.secondary)
                         Slider(value: Binding(
                             get: { Double(stressLevel) },
                             set: { stressLevel = Int($0) }
                         ), in: 1...10, step: 1)
                         Text("High")
                             .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
                 
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 10) {
                     Text("Focus Level: \(focusLevel)/10")
+                        .font(.subheadline)
                     HStack {
                         Text("Low")
                             .font(.caption)
+                            .foregroundColor(.secondary)
                         Slider(value: Binding(
                             get: { Double(focusLevel) },
                             set: { focusLevel = Int($0) }
                         ), in: 1...10, step: 1)
                         Text("High")
                             .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
             }
             
+            // Analyze Button Section
             Section {
                 Button(action: analyzeData) {
-                    if isAnalyzing {
-                        HStack {
+                    HStack {
+                        if isAnalyzing {
                             ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
                             Text("Analyzing...")
+                        } else {
+                            Image(systemName: "brain.head.profile")
+                            Text("Analyze Focus Cues")
                         }
-                    } else {
-                        Text("Analyze Focus Cues")
-                            .frame(maxWidth: .infinity)
                     }
+                    .frame(maxWidth: .infinity)
                 }
                 .disabled(isAnalyzing || activity.isEmpty)
             }
             
+            // Error Display Section
             if let error = errorMessage {
                 Section {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .font(.caption)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Analysis Failed", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundColor(.red)
+                            .font(.headline)
+                        
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                        
+                        if showRetry {
+                            Button(action: analyzeData) {
+                                Label("Retry Analysis", systemImage: "arrow.clockwise")
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                }
+            }
+            
+            // User Info Section (Debug)
+            if Config.useMockData {
+                Section("Debug Info") {
+                    if let user = userSession.currentUser {
+                        Text("User: \(user.name)")
+                        Text("ID: \(user.id)")
+                        Text("Test Mode: \(user.isTestMode ? "Yes" : "No")")
+                    } else {
+                        Text("No user context")
+                            .foregroundColor(.red)
+                    }
                 }
             }
         }
@@ -138,7 +180,8 @@ struct ActivityInputView: View {
         }
     }
     
-    // Computed property for scenario descriptions
+    // MARK: - Computed Properties
+    
     private var scenarioDescription: String {
         switch selectedScenario {
         case .wellRested:
@@ -154,9 +197,20 @@ struct ActivityInputView: View {
         }
     }
     
+    // MARK: - Analysis Logic
+    
     private func analyzeData() {
         isAnalyzing = true
         errorMessage = nil
+        showRetry = false
+        
+        // Ensure user context exists
+        guard let user = userSession.currentUser else {
+            errorMessage = "User session not found. Please restart the app."
+            isAnalyzing = false
+            showRetry = true
+            return
+        }
         
         // Create user input
         let userInput = UserInput(
@@ -172,6 +226,7 @@ struct ActivityInputView: View {
         if !validation.isValid {
             errorMessage = validation.errors.joined(separator: "\n")
             isAnalyzing = false
+            showRetry = false
             return
         }
         
@@ -181,6 +236,7 @@ struct ActivityInputView: View {
                 DispatchQueue.main.async {
                     errorMessage = "Failed to fetch health data"
                     isAnalyzing = false
+                    showRetry = true
                 }
                 return
             }
@@ -191,29 +247,39 @@ struct ActivityInputView: View {
                 DispatchQueue.main.async {
                     errorMessage = "Health data validation failed:\n" + healthValidation.errors.joined(separator: "\n")
                     isAnalyzing = false
+                    showRetry = false
                 }
                 return
             }
             
-            // Send to LLM for analysis
-            llmService.analyzeFocusCues(healthData: healthData, userInput: userInput) { result in
+            // Send to LLM for analysis with user context
+            LLMService.shared.analyzeFocusCues(
+                user: user,
+                healthData: healthData,
+                userInput: userInput
+            ) { result in
                 DispatchQueue.main.async {
                     isAnalyzing = false
                     
                     switch result {
                     case .success(let focusAnalysis):
                         // Save to history
-                        DataManager.shared.saveAnalysis(focusAnalysis)
+                        dataManager.saveAnalysis(focusAnalysis)
                         
                         analysis = focusAnalysis
                         showingAnalysis = true
+                        errorMessage = nil
+                        
                     case .failure(let error):
-                        errorMessage = "Analysis failed: \(error.localizedDescription)"
+                        errorMessage = error.localizedDescription
+                        showRetry = true
                     }
                 }
             }
         }
     }
+    
+    // MARK: - Health Data Fetching
     
     private func fetchHealthData(completion: @escaping (HealthData?) -> Void) {
         if Config.useMockData {
@@ -230,6 +296,7 @@ struct ActivityInputView: View {
             var heartRates: [Double] = []
             var sleepHours: Double = 0
             var steps: Double = 0
+            var activeMinutes: Double = 0
             
             let group = DispatchGroup()
             
@@ -258,12 +325,19 @@ struct ActivityInputView: View {
                 group.leave()
             }
             
+            // Fetch active minutes
+            group.enter()
+            healthManager.fetchActiveMinutes { minutes in
+                activeMinutes = minutes
+                group.leave()
+            }
+            
             group.notify(queue: .main) {
                 let healthData = HealthData(
                     heartRate: heartRates,
                     sleepHours: sleepHours,
                     stepCount: steps,
-                    activeMinutes: steps / 100, // Rough estimate
+                    activeMinutes: activeMinutes,
                     timestamp: Date()
                 )
                 completion(healthData)
@@ -272,7 +346,8 @@ struct ActivityInputView: View {
     }
 }
 
-// Preview for SwiftUI Canvas
+// MARK: - Preview
+
 struct ActivityInputView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationView {
