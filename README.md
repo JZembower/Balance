@@ -243,6 +243,3 @@ The app ships with a full mock-data mode for development and a HealthKit-backed 
   - BalanceAppTests.swift
   - BalanceAppUITests.swift
   - BalanceAppUITestsLaunchTests.swift
-
-### License
-Add your project’s license here (e.g., MIT).
